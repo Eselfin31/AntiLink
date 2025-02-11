@@ -5,18 +5,19 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const { load_translations, getTransation } = require('./utils/helper')
 const mongoURI = process.env.MONGODB_TOKEN;
-async function mongodbConnect() {
-	
-	console.log('URI' + mongoURI)
-// Підключення до MongoDB
-	mongoose.connect(mongoURI, {
-		useNewUrlParser: true,
-		useUnifiedTopology: true,
-	})
-		.then(() => console.log('Connected to MongoDB'))
-		.catch((err) => console.error('MongoDB connection error:', err));
-}
 
+async function mongodbConnect() {
+	try {
+		await mongoose.connect(mongoURI, {
+			useNewUrlParser: true,
+			useUnifiedTopology: true,
+		});
+		console.log('Successfully connected to MongoDB');
+	} catch (error) {
+		console.error('MongoDB connection error:', error);
+		process.exit(1);
+	}
+}
 
 // Токен бота та ID
 const token = process.env.TOKEN;
@@ -30,26 +31,33 @@ const eventsPath = path.join(__dirname, 'events');
 const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
 for (const file of eventFiles) {
-	console.log('Events викликається')
-	const filePath = path.join(eventsPath, file);
-	const event = require(filePath);
-	if (event.once) {
-		client.once(event.name, (...args) => event.execute(...args));
-	} else {
-		client.on(event.name, (...args) => event.execute(...args));
+	try {
+		const filePath = path.join(eventsPath, file);
+		const event = require(filePath);
+		if (event.once) {
+			client.once(event.name, (...args) => event.execute(...args));
+		} else {
+			client.on(event.name, (...args) => event.execute(...args));
+		}
+		console.log(`Successfully loaded event: ${event.name}`);
+	} catch (error) {
+		console.error(`Error loading event ${file}:`, error);
 	}
 }
 
-// Авторизація бота
-async function start_bot(client, token, mongoURI){
-	try{
-		await mongodbConnect(mongoURI)
+async function start_bot(client, token, mongoURI) {
+	try {
+		await mongodbConnect();
 		await client.login(token);
-		}catch(error) {
-			console.log('Виникла помилка при спробі запустити бота(start_bot)' + error)
-			return
+		console.log('Bot successfully started and logged in');
+	} catch (error) {
+		console.error('Error starting bot:', error);
+		process.exit(1);
 	}
 }
 
+process.on('unhandledRejection', (error) => {
+	console.error('Unhandled promise rejection:', error);
+});
 
 start_bot(client, token, mongoURI)
